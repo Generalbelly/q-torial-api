@@ -11,7 +11,7 @@ COPY . .
 # (You may fetch or manage dependencies here,
 # either manually or with a tool like "godep".)
 # RUN GO111MODULE=on CGO_ENABLED=0 GOOS=linux go build -v -o sql_generator
-RUN CGO_ENABLED=0 GOOS=linux go build -mod=readonly -v -o main
+RUN GO111MODULE=on CGO_ENABLED=0 GOOS=linux go build -mod=readonly -v -o main
 
 # Use a Docker multi-stage build to create a lean production image.
 # https://docs.docker.com/develop/develop-images/multistage-build/#use-multi-stage-builds
