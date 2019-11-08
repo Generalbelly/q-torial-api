@@ -4,7 +4,7 @@
 FROM golang:1.12 as builder
 
 # Copy local code to the container image.
-WORKDIR /go/src/github.com/agito-inc/q-torial-api
+WORKDIR /go/src/github.com/Generalbelly/q-torial-api
 COPY . .
 
 # Build the command inside the container.
