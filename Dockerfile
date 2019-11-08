@@ -19,7 +19,7 @@ FROM alpine:3
 RUN apk add --no-cache ca-certificates
 
 # Copy the binary to the production image from the builder stage.
-COPY --from=builder /go/src/github.com/Generalbelly/q-torial-api/main /main
+COPY --from=builder /go/src/github.com/Generalbelly/q-torial-api /q-torial-api
 
 # Run the web service on container startup.
-CMD ["/main"]
+CMD ["/q-torial-api"]
