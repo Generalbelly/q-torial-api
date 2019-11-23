@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cloud.google.com/go/firestore"
 	"context"
 	"encoding/json"
 	"errors"
@@ -10,9 +11,30 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-
-	"cloud.google.com/go/firestore"
 )
+
+type ValidationData struct {
+	Url  *string `json:"url"`
+	Key  *string `json:"key"`
+	Once *bool   `json:"once"`
+}
+
+func validateRequest(r *http.Request) (*ValidationData, error) {
+	d := json.NewDecoder(r.Body)
+	d.DisallowUnknownFields()
+
+	data := ValidationData{}
+	err := d.Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+
+	if data.Url == nil || data.Key == nil || data.Once == nil {
+		return nil, errors.New("url, key, once are required parameters")
+	}
+
+	return &data, nil
+}
 
 func query(ctx context.Context, userKey string, targetUrl string) (*model.QueryResult, error) {
 	projectID := os.Getenv("PROJECT_ID")
@@ -103,23 +125,32 @@ func query(ctx context.Context, userKey string, targetUrl string) (*model.QueryR
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
-
-	w.Header().Set("Content-Type", "application/json")
-	var response *model.QueryResult
-	var err error
-	var res []byte
-
-	q := r.URL.Query()
-	url := q.Get("url")
-	userKey := q.Get("key")
-
-	if len(url) == 0 || len(userKey) == 0 {
-		err = errors.New("url and key are required parameters")
-	} else {
-		response, err = query(ctx, userKey, url)
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		fmt.Fprintf(w, "invalid_http_method")
+		return
 	}
 
+	ctx := context.Background()
+	w.Header().Set("Content-Type", "application/json")
+
+	var err error
+	var data *ValidationData
+	data, err = validateRequest(r)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+	if data == nil {
+		fmt.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var response *model.QueryResult
+	var res []byte
+	response, err = query(ctx, *data.Key, *data.Url)
 	res, err = json.Marshal(response)
 
 	if err != nil {
