@@ -79,10 +79,15 @@ func query(ctx context.Context, userKey string, targetUrl string, shownTutorials
 		if err != nil {
 			return queryResult, err
 		}
+		shown := false
 		for _, id := range shownTutorialsIDs {
 			if doc.Ref.ID == id {
-				continue
+				shown = true
+				break
 			}
+		}
+		if shown {
+			continue
 		}
 		valid, err := model.ValidateUrlPath(tutorial.PathOperator, tutorial.PathValue, u.Path)
 		if err != nil {
