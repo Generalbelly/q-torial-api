@@ -14,9 +14,9 @@ import (
 )
 
 type ValidationData struct {
-	Url  *string `json:"url"`
-	Key  *string `json:"key"`
-	Once *bool   `json:"once"`
+	Url  *string   `json:"url"`
+	Key  *string   `json:"key"`
+	Once *[]string `json:"once"`
 }
 
 func validateRequest(r *http.Request) (*ValidationData, error) {
@@ -36,7 +36,7 @@ func validateRequest(r *http.Request) (*ValidationData, error) {
 	return &data, nil
 }
 
-func query(ctx context.Context, userKey string, targetUrl string) (*model.QueryResult, error) {
+func query(ctx context.Context, userKey string, targetUrl string, shownTutorialsIDs []string) (*model.QueryResult, error) {
 	projectID := os.Getenv("PROJECT_ID")
 	if projectID == "" {
 		log.Fatalf("PROJECT_ID is not set")
@@ -73,6 +73,11 @@ func query(ctx context.Context, userKey string, targetUrl string) (*model.QueryR
 		tutorial, err := model.NewTutorial(doc)
 		if err != nil {
 			return nil, err
+		}
+		for _, id := range shownTutorialsIDs {
+			if doc.Ref.ID == id {
+				continue
+			}
 		}
 		valid, err := model.ValidateUrlPath(tutorial.PathOperator, tutorial.PathValue, u.Path)
 		if err != nil {
@@ -158,7 +163,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	var response *model.QueryResult
 	var res []byte
-	response, err = query(ctx, *data.Key, *data.Url)
+	response, err = query(ctx, *data.Key, *data.Url, *data.Once)
 	res, err = json.Marshal(response)
 
 	if err != nil {
