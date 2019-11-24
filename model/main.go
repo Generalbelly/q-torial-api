@@ -101,7 +101,6 @@ func ValidateUrlPath(pathOperator string, pathValue string, urlPath string) (boo
 	if pathValue[len(pathValue)-1:] == "/" {
 		pv = pathValue[:len(pv)-1]
 	}
-	fmt.Println(pv)
 	up := urlPath
 	if urlPath[len(urlPath)-1:] == "/" {
 		up = urlPath[:len(urlPath)-1]

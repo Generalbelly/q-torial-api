@@ -145,6 +145,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method != http.MethodPost {
+		w.Header().Set("Cache-Control", "public, max-age=300, s-maxage=600")
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
