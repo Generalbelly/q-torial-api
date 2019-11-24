@@ -125,6 +125,10 @@ func query(ctx context.Context, userKey string, targetUrl string) (*model.QueryR
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		fmt.Fprintf(w, "invalid_http_method")
