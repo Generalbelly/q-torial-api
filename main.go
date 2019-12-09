@@ -14,9 +14,9 @@ import (
 )
 
 type ValidationData struct {
-	Url  *string `json:"url"`
-	Key  *string `json:"key"`
-	Once *bool   `json:"once"`
+	Url  *string   `json:"url"`
+	Key  *string   `json:"key"`
+	Once *[]string `json:"once"`
 }
 
 func validateRequest(r *http.Request) (*ValidationData, error) {
@@ -36,7 +36,7 @@ func validateRequest(r *http.Request) (*ValidationData, error) {
 	return &data, nil
 }
 
-func query(ctx context.Context, userKey string, targetUrl string) (*model.QueryResult, error) {
+func query(ctx context.Context, userKey string, targetUrl string, shownTutorialsIDs []string) (*model.QueryResult, error) {
 	projectID := os.Getenv("PROJECT_ID")
 	if projectID == "" {
 		log.Fatalf("PROJECT_ID is not set")
@@ -51,9 +51,14 @@ func query(ctx context.Context, userKey string, targetUrl string) (*model.QueryR
 	var selectedTutorial *model.Tutorial = nil
 	var ga *model.Ga = nil
 
+	queryResult := &model.QueryResult{
+		Tutorial: selectedTutorial,
+		Ga:       ga,
+	}
+
 	u, err := url.Parse(targetUrl)
 	if err != nil {
-		return nil, err
+		return queryResult, err
 	}
 
 	docs, err := client.Collection("users").
@@ -65,18 +70,28 @@ func query(ctx context.Context, userKey string, targetUrl string) (*model.QueryR
 		GetAll()
 
 	if err != nil {
-		return nil, err
+		return queryResult, err
 	}
 
 	matchedTutorials := make([]*model.Tutorial, 0)
 	for _, doc := range docs {
 		tutorial, err := model.NewTutorial(doc)
 		if err != nil {
-			return nil, err
+			return queryResult, err
+		}
+		shown := false
+		for _, id := range shownTutorialsIDs {
+			if doc.Ref.ID == id {
+				shown = true
+				break
+			}
+		}
+		if shown {
+			continue
 		}
 		valid, err := model.ValidateUrlPath(tutorial.PathOperator, tutorial.PathValue, u.Path)
 		if err != nil {
-			return nil, err
+			return queryResult, err
 		}
 		if valid {
 			hasSameParameters := true
@@ -87,7 +102,7 @@ func query(ctx context.Context, userKey string, targetUrl string) (*model.QueryR
 			}
 			tutorialDomain, err := url.Parse(tutorial.Domain)
 			if err != nil {
-				return nil, err
+				return queryResult, err
 			}
 			if hasSameParameters && (len(tutorial.Domain) == 0 || (len(tutorial.Domain) > 0 && tutorialDomain.Hostname() == u.Hostname())) {
 				matchedTutorials = append(matchedTutorials, tutorial)
@@ -95,39 +110,48 @@ func query(ctx context.Context, userKey string, targetUrl string) (*model.QueryR
 		}
 	}
 	if len(matchedTutorials) > 0 {
-		selectedTutorial = matchedTutorials[0]
+		queryResult.Tutorial = matchedTutorials[0]
 	}
-	if selectedTutorial != nil {
-		selectedTutorialRef := client.Collection("users").Doc(userKey).Collection("tutorials").Doc(selectedTutorial.ID)
+	if queryResult.Tutorial != nil {
+		selectedTutorialRef := client.Collection("users").Doc(userKey).Collection("tutorials").Doc(queryResult.Tutorial.ID)
 		docs, err := selectedTutorialRef.Collection("steps").OrderBy("order", firestore.Asc).Documents(ctx).GetAll()
 		if err != nil {
-			return nil, err
+			return queryResult, err
 		}
 		for _, doc := range docs {
 			step, err := model.NewStep(doc)
 			if err != nil {
-				return nil, err
+				return queryResult, err
 			}
-			selectedTutorial.Steps = append(selectedTutorial.Steps, step)
+			queryResult.Tutorial.Steps = append(queryResult.Tutorial.Steps, step)
 		}
-		if len(selectedTutorial.GaID) > 0 {
-			doc, err := client.Collection("users").Doc(userKey).Collection("gas").Doc(selectedTutorial.GaID).Get(ctx)
+		if len(queryResult.Tutorial.GaID) > 0 {
+			doc, err := client.Collection("users").Doc(userKey).Collection("gas").Doc(queryResult.Tutorial.GaID).Get(ctx)
 			if err != nil {
-				return nil, err
+				return queryResult, err
 			}
 			ga, err = model.NewGa(doc)
+			if err != nil {
+				return queryResult, err
+			}
+			queryResult.Ga = ga
 		}
 	}
-	return &model.QueryResult{
-		Tutorial: selectedTutorial,
-		Ga:       ga,
-	}, nil
+	return queryResult, nil
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Methods", "POST")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Max-Age", "3600")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	if r.Method != http.MethodPost {
+		w.Header().Set("Cache-Control", "public, max-age=300, s-maxage=600")
 		w.WriteHeader(http.StatusMethodNotAllowed)
-		fmt.Fprintf(w, "invalid_http_method")
 		return
 	}
 
@@ -143,14 +167,13 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if data == nil {
-		fmt.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	var response *model.QueryResult
 	var res []byte
-	response, err = query(ctx, *data.Key, *data.Url)
+	response, err = query(ctx, *data.Key, *data.Url, *data.Once)
 	res, err = json.Marshal(response)
 
 	if err != nil {

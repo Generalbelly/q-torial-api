@@ -32,18 +32,6 @@ type Parameter struct {
 }
 
 func NewTutorial(doc *firestore.DocumentSnapshot) (*Tutorial, error) {
-	//tutorial = &Tutorial{
-	//	ID:           doc.Ref.ID,
-	//	Name:         d["name"].(string),
-	//	Description:  d["description"].(string),
-	//	Domain:       d["domain"].(string),
-	//	PathOperator: d["pathOperator"].(string),
-	//	PathValue:    d["pathValue"].(string),
-	//	Parameters:   nil,
-	//	Settings:     Settings{},
-	//	IsActive:     d["isActive"].(bool),
-	//	GaID:         d["gaId"].(string),
-	//}
 	var tutorial *Tutorial
 	if err := doc.DataTo(&tutorial); err != nil {
 		return nil, err
@@ -59,13 +47,13 @@ type Step struct {
 		Target      string `firestore:"target" json:"target"`
 		Event       string `firestore:"event" json:"event"`
 		WaitingTime int    `firestore:"waitingTime" json:"waitingTime"`
-	} `firestore:"trigger"`
+	} `firestore:"trigger" json:"trigger"`
 	HighlightTarget string                 `firestore:"highlightTarget" json:"highlightTarget"`
 	Config          map[string]interface{} `firestore:"config" json:"config"`
-	Order           int
-	PathOperator    string      `firestore:"pathOperator" json:"pathOperator"` // ALL, EQUALS, STARTS_WITH, ENDS_WITH, CONTAINS, REGEX, NOT_EQUALS
-	PathValue       string      `firestore:"pathValue" json:"pathValue"`
-	Parameters      []Parameter `firestore:"parameters" json:"parameters"`
+	Order           int                    `firestore:"order" json:"order"`
+	PathOperator    string                 `firestore:"pathOperator" json:"pathOperator"` // ALL, EQUALS, STARTS_WITH, ENDS_WITH, CONTAINS, REGEX, NOT_EQUALS
+	PathValue       string                 `firestore:"pathValue" json:"pathValue"`
+	Parameters      []Parameter            `firestore:"parameters" json:"parameters"`
 }
 
 func NewStep(doc *firestore.DocumentSnapshot) (*Step, error) {
@@ -113,7 +101,6 @@ func ValidateUrlPath(pathOperator string, pathValue string, urlPath string) (boo
 	if pathValue[len(pathValue)-1:] == "/" {
 		pv = pathValue[:len(pv)-1]
 	}
-	fmt.Println(pv)
 	up := urlPath
 	if urlPath[len(urlPath)-1:] == "/" {
 		up = urlPath[:len(urlPath)-1]
